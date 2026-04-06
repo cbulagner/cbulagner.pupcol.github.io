@@ -1,0 +1,1060 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PUPSIS – Schedule Builder</title>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Roboto', Arial, sans-serif; background: #f3f3f3; color: #222; font-size: 14px; }
+
+/* ── TOP NAV ── */
+.top-nav {
+  background: #fff; border-bottom: 1px solid #ddd;
+  display: flex; align-items: center; padding: 0 24px; height: 52px;
+  position: sticky; top: 0; z-index: 200;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.07);
+}
+.nav-logo { display: flex; align-items: center; gap: 10px; margin-right: 36px; text-decoration: none; }
+.nav-logo-star {
+  width: 36px; height: 36px;
+  background: radial-gradient(circle, #ffd700 30%, #b8900a 100%);
+  border-radius: 50%; border: 2.5px solid #8B0000;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 17px; color: #8B0000; font-weight: 900;
+}
+.nav-logo-text { font-weight: 700; font-size: 16px; color: #8B0000; letter-spacing: 0.5px; }
+.nav-links { display: flex; height: 100%; }
+.nav-link {
+  display: flex; align-items: center; padding: 0 15px;
+  font-size: 13.5px; color: #555; text-decoration: none;
+  border-bottom: 3px solid transparent;
+  transition: color 0.15s; cursor: pointer; height: 100%;
+}
+.nav-link:hover { color: #8B0000; }
+.nav-link.active { color: #8B0000; border-bottom-color: #8B0000; font-weight: 500; }
+.nav-right { margin-left: auto; display: flex; align-items: center; gap: 12px; }
+.nav-icon { width: 28px; height: 28px; border-radius: 50%; background: #eee; display: flex; align-items: center; justify-content: center; font-size: 14px; cursor: pointer; }
+
+/* ── PAGE HEADER ── */
+.page-header { background: #fff; border-bottom: 1px solid #e0e0e0; padding: 16px 28px 0; }
+.page-title { font-size: 22px; font-weight: 400; color: #222; margin-bottom: 14px; }
+
+/* ── STUDENT INFO ── */
+.student-bar {
+  background: #fff; border-bottom: 2px solid #8B0000;
+  padding: 10px 28px; display: flex; gap: 24px; align-items: flex-end; flex-wrap: wrap;
+}
+.sfield { display: flex; flex-direction: column; gap: 4px; }
+.sfield label { font-size: 10.5px; font-weight: 700; color: #8B0000; letter-spacing: 0.8px; text-transform: uppercase; }
+.sfield input {
+  border: none; border-bottom: 1.5px solid #ccc;
+  padding: 4px 4px 4px 0; font-size: 13.5px;
+  font-family: 'Roboto', sans-serif; color: #8B0000; font-weight: 500;
+  background: transparent; min-width: 240px; outline: none;
+  transition: border-color 0.18s;
+}
+.sfield input:focus { border-bottom-color: #8B0000; }
+.sfield input::placeholder { color: #bbb; font-weight: 400; }
+
+/* ── STATS ROW ── */
+.stats-row {
+  background: #fff; padding: 8px 28px; border-bottom: 1px solid #e8e8e8;
+  display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+}
+.stag {
+  font-size: 12.5px; padding: 4px 12px; border-radius: 3px;
+  font-weight: 500; display: flex; align-items: center; gap: 5px;
+}
+.stag.units   { background: #fff3e0; color: #b45a00; border: 1px solid #f5c89a; }
+.stag.subs    { background: #e8f5e9; color: #2e7d32; border: 1px solid #a5d6a7; }
+.stag.cwarn   { background: #fdecea; color: #c62828; border: 1px solid #ef9a9a; cursor: pointer; }
+.stag.cok     { background: #e8f5e9; color: #2e7d32; border: 1px solid #a5d6a7; }
+.export-btn {
+  margin-left: auto; padding: 7px 18px; background: #8B0000; color: #fff;
+  border: none; border-radius: 4px; font-size: 13px; font-weight: 500;
+  font-family: 'Roboto', sans-serif; cursor: pointer;
+  display: flex; align-items: center; gap: 6px; transition: background 0.15s;
+}
+.export-btn:hover:not(:disabled) { background: #6d0000; }
+.export-btn:disabled { background: #bbb; cursor: not-allowed; }
+.clear-top {
+  padding: 7px 13px; background: transparent; color: #888;
+  border: 1px solid #ddd; border-radius: 4px; font-size: 12.5px;
+  font-family: 'Roboto', sans-serif; cursor: pointer; transition: all 0.14s;
+}
+.clear-top:hover { border-color: #8B0000; color: #8B0000; }
+
+/* ── CONFLICT PANEL ── */
+.cpanel {
+  display: none; background: #fff8f8; border-left: 4px solid #c62828;
+  margin: 0 28px; padding: 10px 16px;
+  font-size: 12px; color: #8B0000; line-height: 1.75;
+}
+.cpanel.vis { display: block; }
+
+/* ── MAIN LAYOUT ── */
+.app-body { display: flex; height: calc(100vh - 183px); min-height: 400px; }
+
+/* ── LEFT PANEL ── */
+.left-panel {
+  width: 315px; min-width: 270px; background: #fff;
+  border-right: 1px solid #ddd; display: flex; flex-direction: column; overflow: hidden;
+}
+.lp-head { padding: 12px 14px 8px; border-bottom: 1px solid #eee; }
+.lp-head h3 { font-size: 12px; font-weight: 700; color: #8B0000; text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 8px; }
+.sec-tabs { display: flex; flex-wrap: wrap; gap: 5px; }
+.tabbtn {
+  padding: 4px 9px; border-radius: 3px; border: 1px solid #ddd;
+  background: #fafafa; color: #555; font-size: 11px;
+  font-family: 'Roboto', sans-serif; font-weight: 500; cursor: pointer; transition: all 0.12s;
+}
+.tabbtn:hover { border-color: #8B0000; color: #8B0000; }
+.tabbtn.on { background: #8B0000; border-color: #8B0000; color: #fff; }
+.srchwrap { padding: 7px 10px; border-bottom: 1px solid #eee; }
+.srchwrap input {
+  width: 100%; padding: 6px 9px; border: 1px solid #ddd; border-radius: 3px;
+  font-size: 13px; font-family: 'Roboto', sans-serif; outline: none;
+  color: #333; background: #fafafa; transition: border-color 0.18s;
+}
+.srchwrap input:focus { border-color: #8B0000; background: #fff; }
+.sub-list { flex: 1; overflow-y: auto; padding: 4px 8px 8px; }
+.sub-list::-webkit-scrollbar { width: 4px; }
+.sub-list::-webkit-scrollbar-thumb { background: #e0e0e0; border-radius: 4px; }
+.grp-lbl { font-size: 10px; font-weight: 700; color: #8B0000; letter-spacing: 1px; text-transform: uppercase; padding: 8px 5px 3px; }
+.scard {
+  border: 1px solid #e8e8e8; border-radius: 4px; padding: 8px 10px;
+  margin-bottom: 4px; cursor: pointer; transition: all 0.12s; background: #fafafa;
+}
+.scard:hover { border-color: #8B0000; background: #fff8f8; }
+.scard.sel   { border-color: #8B0000; background: #fff0f0; }
+.scard.con   { border-color: #e53935 !important; background: #fff5f5 !important; }
+.scard.hid   { display: none; }
+.sc-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 6px; }
+.sc-name { font-size: 12.5px; font-weight: 500; color: #333; line-height: 1.4; flex: 1; }
+.sc-chk {
+  width: 15px; height: 15px; border-radius: 2px; border: 1.5px solid #ccc;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; margin-top: 2px; transition: all 0.12s;
+}
+.scard.sel .sc-chk { background: #8B0000; border-color: #8B0000; }
+.sc-chk svg { display: none; }
+.scard.sel .sc-chk svg { display: block; }
+.chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 5px; }
+.chip { font-size: 9.5px; padding: 1px 6px; border-radius: 2px; font-weight: 500; }
+.chip.cd  { background: #f0f0f0; color: #666; }
+.chip.un  { background: #fff3e0; color: #b45a00; }
+.chip.sc  { background: #e8f5e9; color: #2e7d32; }
+.chip.sh  { background: #e3f2fd; color: #1565c0; }
+
+/* ── CALENDAR ── */
+.right-panel { flex: 1; overflow: auto; padding: 18px 22px; background: #f3f3f3; }
+.cal-ttl {
+  font-size: 13px; font-weight: 700; color: #8B0000;
+  text-transform: uppercase; letter-spacing: 0.5px;
+  margin-bottom: 11px; display: flex; align-items: center; gap: 10px;
+}
+.cal-ttl span { color: #aaa; font-weight: 400; font-size: 12px; text-transform: none; letter-spacing: 0; }
+.cal-grid {
+  display: grid;
+  grid-template-columns: 60px repeat(6, 1fr);
+  background: #fff; border: 1px solid #ddd;
+  border-radius: 4px; overflow: hidden; min-width: 580px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+}
+.ch {
+  padding: 9px 6px; text-align: center; font-size: 11px; font-weight: 700;
+  letter-spacing: 0.8px; text-transform: uppercase;
+  background: #8B0000; color: #fff; border-right: 1px solid rgba(255,255,255,0.15);
+}
+.ch.th { background: #6d0000; font-size: 9.5px; }
+.tc {
+  font-size: 9px; color: #bbb; text-align: right;
+  padding: 2px 5px 0; border-right: 1px solid #ebebeb;
+  border-bottom: 1px solid #f0f0f0; background: #fafafa;
+}
+.dc {
+  border-right: 1px solid #ebebeb; border-bottom: 1px solid #f0f0f0;
+  min-height: 25px; position: relative;
+}
+.dc.half { border-bottom: 1px dashed #f2f2f2; }
+.cblk {
+  position: absolute; left: 2px; right: 2px; border-radius: 3px;
+  padding: 3px 5px; font-size: 10px; line-height: 1.3; overflow: hidden;
+  z-index: 2; box-shadow: 0 1px 3px rgba(0,0,0,0.15); cursor: default;
+}
+.cblk.xcon { outline: 2px solid #e53935; outline-offset: -2px; }
+.cblk .ck  { font-size: 9px; opacity: 0.8; }
+.cblk .cn  { font-weight: 700; font-size: 10px; }
+.cblk .ci  { font-size: 9px; opacity: 0.75; }
+
+.c-jd31  { background:#1565c0; color:#e3f2fd; }
+.c-jd32  { background:#2e7d32; color:#e8f5e9; }
+.c-jd33  { background:#6a1b9a; color:#f3e5f5; }
+.c-jd21d { background:#e65100; color:#fff3e0; }
+.c-jd22  { background:#7b0000; color:#ffebee; }
+.c-jd23  { background:#00695c; color:#e0f2f1; }
+.c-jd24  { background:#558b2f; color:#f1f8e9; }
+
+.empty-c { text-align: center; padding: 60px 20px; color: #ccc; }
+.empty-c .ei { font-size: 38px; margin-bottom: 10px; }
+.legend { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.li { display: flex; align-items: center; gap: 5px; font-size: 11px; color: #666; }
+.ld { width: 10px; height: 10px; border-radius: 2px; }
+
+/* ── MODAL ── */
+.mbg {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,0,0.4); z-index: 500;
+  align-items: center; justify-content: center;
+}
+.mbg.open { display: flex; }
+.modal {
+  background: #fff; border-radius: 5px; padding: 28px 30px;
+  max-width: 400px; width: 90%; text-align: center;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.22);
+}
+.modal h3 { font-size: 16px; color: #8B0000; margin-bottom: 10px; }
+.modal p  { font-size: 13px; color: #555; line-height: 1.6; margin-bottom: 20px; }
+.mclose {
+  padding: 8px 24px; background: #8B0000; color: #fff;
+  border: none; border-radius: 4px; cursor: pointer;
+  font-size: 13px; font-family: 'Roboto', sans-serif; font-weight: 500;
+}
+.mclose:hover { background: #6d0000; }
+
+/* ── IMPORT MODAL ── */
+.imbg {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,0,0.45); z-index: 600;
+  align-items: center; justify-content: center;
+}
+.imbg.open { display: flex; }
+.imodal {
+  background: #fff; border-radius: 6px;
+  width: 560px; max-width: 95vw;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.28);
+  overflow: hidden;
+}
+.im-head {
+  background: #8B0000; color: #fff;
+  padding: 16px 22px; display: flex; align-items: center; justify-content: space-between;
+}
+.im-head h3 { font-size: 15px; font-weight: 600; }
+.im-close-x {
+  background: none; border: none; color: rgba(255,255,255,0.7);
+  font-size: 20px; cursor: pointer; line-height: 1; padding: 0 2px;
+  transition: color 0.15s;
+}
+.im-close-x:hover { color: #fff; }
+.im-body { padding: 22px; }
+
+/* Drop zone */
+.dropzone {
+  border: 2px dashed #d0d0d0; border-radius: 6px;
+  padding: 30px 20px; text-align: center;
+  cursor: pointer; transition: all 0.2s; background: #fafafa;
+  position: relative;
+}
+.dropzone:hover, .dropzone.drag-over { border-color: #8B0000; background: #fff5f5; }
+.dropzone input[type=file] {
+  position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;
+}
+.dz-icon { font-size: 32px; margin-bottom: 8px; }
+.dz-main { font-size: 13.5px; font-weight: 500; color: #444; margin-bottom: 4px; }
+.dz-sub  { font-size: 11.5px; color: #999; }
+.dz-filename {
+  display: none; margin-top: 10px; padding: 6px 12px;
+  background: #fff3e0; border: 1px solid #f5c89a;
+  border-radius: 4px; font-size: 12px; color: #b45a00; font-weight: 500;
+}
+
+/* Preview panel */
+.im-preview {
+  display: none; margin-top: 16px;
+  border: 1px solid #e0e0e0; border-radius: 5px; overflow: hidden;
+}
+.im-preview.vis { display: block; }
+.imp-head {
+  background: #f5f5f5; border-bottom: 1px solid #e0e0e0;
+  padding: 8px 14px; font-size: 12px; font-weight: 700;
+  color: #555; text-transform: uppercase; letter-spacing: 0.5px;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.imp-status { font-size: 12px; font-weight: 500; }
+.imp-status.ok  { color: #2e7d32; }
+.imp-status.err { color: #c62828; }
+.imp-scroll { max-height: 180px; overflow-y: auto; }
+.imp-scroll::-webkit-scrollbar { width: 4px; }
+.imp-scroll::-webkit-scrollbar-thumb { background: #ddd; border-radius: 4px; }
+.imp-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 6px 14px; border-bottom: 1px solid #f5f5f5; font-size: 12px;
+}
+.imp-row:last-child { border-bottom: none; }
+.imp-row.err-row { background: #fff5f5; color: #c62828; }
+.imp-row.sec-row { color: #444; }
+.imp-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.imp-summary {
+  padding: 8px 14px; background: #f9f9f9;
+  border-top: 1px solid #e8e8e8; font-size: 12px; color: #666;
+  display: flex; gap: 16px;
+}
+.imp-summary strong { color: #8B0000; }
+
+/* Import action buttons */
+.im-actions {
+  padding: 14px 22px; border-top: 1px solid #eee;
+  display: flex; justify-content: flex-end; gap: 10px; background: #fafafa;
+}
+.im-cancel {
+  padding: 7px 18px; background: #fff; color: #555;
+  border: 1px solid #ddd; border-radius: 4px;
+  font-size: 13px; font-family: 'Roboto', sans-serif; cursor: pointer;
+  transition: all 0.14s;
+}
+.im-cancel:hover { border-color: #999; color: #333; }
+.im-confirm {
+  padding: 7px 20px; background: #8B0000; color: #fff;
+  border: none; border-radius: 4px;
+  font-size: 13px; font-weight: 500; font-family: 'Roboto', sans-serif;
+  cursor: pointer; transition: background 0.15s;
+}
+.im-confirm:hover:not(:disabled) { background: #6d0000; }
+.im-confirm:disabled { background: #ccc; cursor: not-allowed; }
+
+/* Update DB button */
+.update-db-btn {
+  padding: 6px 14px;
+  background: transparent; color: #8B0000;
+  border: 1.5px solid #8B0000; border-radius: 4px;
+  font-size: 12.5px; font-weight: 500;
+  font-family: 'Roboto', sans-serif;
+  cursor: pointer; display: flex; align-items: center; gap: 6px;
+  transition: all 0.15s; white-space: nowrap;
+}
+.update-db-btn:hover { background: #8B0000; color: #fff; }
+
+/* DB source badge */
+.db-badge {
+  font-size: 11px; padding: 3px 10px;
+  border-radius: 10px; background: #f5f5f5;
+  border: 1px solid #e0e0e0; color: #888;
+  display: flex; align-items: center; gap: 5px;
+}
+.db-badge.custom { background: #fff3e0; border-color: #f5c89a; color: #b45a00; }
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav class="top-nav">
+  <a class="nav-logo" href="#">
+    <div class="nav-logo-star">★</div>
+    <div class="nav-logo-text">PUPSIS</div>
+  </a>
+  <div class="nav-links">
+    <span class="nav-link">Home</span>
+    <span class="nav-link">Enrollment</span>
+    <span class="nav-link">Accounts</span>
+    <span class="nav-link active">Schedule</span>
+    <span class="nav-link">Grades</span>
+    <span class="nav-link">Forms</span>
+    <span class="nav-link">HDF</span>
+  </div>
+  <div class="nav-right">
+    <div class="db-badge" id="dbBadge">📋 Built-in Dataset</div>
+    <button class="update-db-btn" onclick="openImport()">⬆ Update Database</button>
+    <div class="nav-icon">👤</div>
+    <div class="nav-icon">🚪</div>
+  </div>
+</nav>
+
+<!-- PAGE TITLE -->
+<div class="page-header">
+  <div class="page-title">Schedule Builder</div>
+</div>
+
+<!-- STUDENT INFO -->
+<div class="student-bar">
+  <div class="sfield">
+    <label>Student Name</label>
+    <input type="text" id="studentName" placeholder="LASTNAME, FIRSTNAME M.I.">
+  </div>
+  <div class="sfield">
+    <label>Student Number</label>
+    <input type="text" id="studentNum" placeholder="YYYY-NNNNN-XX-0">
+  </div>
+</div>
+
+<!-- STATS -->
+<div class="stats-row">
+  <div class="stag units" id="tagU">0 units selected</div>
+  <div class="stag subs"  id="tagS">0 subjects</div>
+  <div class="stag cok"   id="tagC" onclick="toggleCP()">✓ No conflicts</div>
+  <button class="clear-top" onclick="clearAll()">✕ Clear All</button>
+  <button class="export-btn" id="expBtn" onclick="doExport()" disabled>
+    ⬇ Export Pre-Registration Form
+  </button>
+</div>
+<div class="cpanel" id="cpanel"></div>
+
+<!-- MAIN -->
+<div class="app-body">
+
+  <!-- LEFT -->
+  <div class="left-panel">
+    <div class="lp-head">
+      <h3>Available Subjects</h3>
+      <div class="sec-tabs" id="secTabs">
+        <!-- populated dynamically by buildSecTabs() -->
+      </div>
+    </div>
+    <div class="srchwrap">
+      <input type="text" id="srch" placeholder="🔍  Search subject or code…" oninput="doSearch()">
+    </div>
+    <div class="sub-list" id="subList"></div>
+  </div>
+
+  <!-- RIGHT -->
+  <div class="right-panel">
+    <div class="cal-ttl">Weekly Schedule <span>· Click subjects on the left to add</span></div>
+    <div id="calBox"></div>
+    <div class="legend" id="leg"></div>
+  </div>
+</div>
+
+<!-- IMPORT MODAL -->
+<div class="imbg" id="imbg">
+  <div class="imodal">
+    <div class="im-head">
+      <h3>📂 Update Subject Database</h3>
+      <button class="im-close-x" onclick="closeImport()">✕</button>
+    </div>
+    <div class="im-body">
+      <div class="dropzone" id="dropzone"
+           ondragover="dzDrag(event,true)" ondragleave="dzDrag(event,false)" ondrop="dzDrop(event)">
+        <input type="file" id="xlsxFile" accept=".xlsx,.xls" onchange="onFileChosen(event)">
+        <div class="dz-icon">📊</div>
+        <div class="dz-main">Drop your spreadsheet here, or click to browse</div>
+        <div class="dz-sub">Accepted formats: .xlsx, .xls &nbsp;·&nbsp; Same column layout as the original schedule file</div>
+        <div class="dz-filename" id="dzFilename"></div>
+      </div>
+
+      <div class="im-preview" id="imPreview">
+        <div class="imp-head">
+          <span>Import Preview</span>
+          <span class="imp-status" id="impStatus"></span>
+        </div>
+        <div class="imp-scroll" id="impScroll"></div>
+        <div class="imp-summary" id="impSummary"></div>
+      </div>
+    </div>
+    <div class="im-actions">
+      <button class="im-cancel" onclick="closeImport()">Cancel</button>
+      <button class="im-confirm" id="imConfirm" onclick="commitImport()" disabled>Apply &amp; Replace Database</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL -->
+<div class="mbg" id="mbg">
+  <div class="modal">
+    <h3 id="mtitle"></h3>
+    <p  id="mmsg"></p>
+    <button class="mclose" onclick="closeM()">OK</button>
+  </div>
+</div>
+
+<script>
+/* ── DATA ─────────────────────────────────────────────────────────────── */
+const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+const DS = {Monday:'Mon',Tuesday:'Tue',Wednesday:'Wed',Thursday:'Thu',Friday:'Fri',Saturday:'Sat'};
+
+// Column map: day name → spreadsheet column index (0-based, matching original xlsx)
+const DAY_COL = {Monday:4, Tuesday:5, Wednesday:6, Thursday:7, Friday:8, Saturday:9};
+
+const RAW = [
+  {s:'JD 3-1', c:'JD305',  n:'Laws on Local Government',                          u:2,d:'Wednesday',t:'7:30-9:30 PM'},
+  {s:'JD 3-1', c:'JD801N', n:'Labor Relations',                                   u:2,d:'Thursday', t:'5:30-7:30 PM'},
+  {s:'JD 3-1', c:'JD505',  n:'Torts and Damages',                                 u:2,d:'Tuesday',  t:'7:30-9:30 PM'},
+  {s:'JD 3-1', c:'HD506',  n:'Private International Law',                         u:2,d:'Thursday', t:'7:30-9:30 PM'},
+  {s:'JD 3-1', c:'JD901B', n:'Basic Taxation Law II',                             u:2,d:'Friday',   t:'5:30-7:30 PM'},
+  {s:'JD 3-1', c:'JD803',  n:'Gender Sensitivity & Laws on Women and Children',   u:2,d:'Saturday', t:'1-3 PM'},
+  {s:'JD 3-1', c:'JD1006', n:'Special Penal Laws (Elective)',                     u:2,d:'Saturday', t:'5-7 PM'},
+  {s:'JD 3-1', c:'JD1007', n:'Alternative Dispute Resolution (Elective)',         u:2,d:'Tuesday',  t:'5:30-7:30 PM'},
+  {s:'JD 3-1', c:'JD1001', n:'Thesis I',                                          u:1,d:'Friday',   t:'7:30-8:30 PM'},
+  {s:'JD 3-1', c:'JD105',  n:'Chilican Legal Education',                          u:2,d:'Wednesday',t:'5:30-7:30 PM'},
+  {s:'JD 3-2', c:'JD305',  n:'Laws on Local Government',                          u:2,d:'Friday',   t:'5:30-7:30 PM'},
+  {s:'JD 3-2', c:'JD801N', n:'Labor Relations',                                   u:2,d:'Wednesday',t:'7:30-9:30 PM'},
+  {s:'JD 3-2', c:'JD505',  n:'Torts and Damages',                                 u:2,d:'Tuesday',  t:'5:30-7:30 PM'},
+  {s:'JD 3-2', c:'HD506',  n:'Private International Law',                         u:2,d:'Thursday', t:'5:30-7:30 PM'},
+  {s:'JD 3-2', c:'JD901B', n:'Basic Taxation Law II',                             u:2,d:'Saturday', t:'1-3 PM'},
+  {s:'JD 3-2', c:'JD803',  n:'Gender Sensitivity & Laws on Women and Children',   u:2,d:'Saturday', t:'10-12 NN'},
+  {s:'JD 3-2', c:'JD1006', n:'Special Penal Laws (Elective)',                     u:2,d:'Thursday', t:'7:30-9:30 PM'},
+  {s:'JD 3-2', c:'JD1007', n:'Alternative Dispute Resolution (Elective)',         u:2,d:'Tuesday',  t:'7:30-9:30 PM'},
+  {s:'JD 3-2', c:'JD1001', n:'Thesis I',                                          u:1,d:'Friday',   t:'8:30-9:30 PM'},
+  {s:'JD 3-2', c:'JD105',  n:'Chilican Legal Education',                          u:2,d:'Wednesday',t:'5:30-7:30 PM'},
+  {s:'JD 3-3', c:'JD305',  n:'Laws on Local Government',                          u:2,d:'Friday',   t:'7:30-9:30 PM'},
+  {s:'JD 3-3', c:'JD801N', n:'Labor Relations',                                   u:2,d:'Friday',   t:'5:30-7:30 PM'},
+  {s:'JD 3-3', c:'JD505',  n:'Torts and Damages',                                 u:2,d:'Tuesday',  t:'7:30-9:30 PM'},
+  {s:'JD 3-3', c:'HD506',  n:'Private International Law',                         u:2,d:'Tuesday',  t:'5:30-7:30 PM'},
+  {s:'JD 3-3', c:'JD901B', n:'Basic Taxation Law II',                             u:2,d:'Saturday', t:'10-12 NN'},
+  {s:'JD 3-3', c:'JD803',  n:'Gender Sensitivity & Laws on Women and Children',   u:2,d:'Wednesday',t:'5:30-7:30 PM'},
+  {s:'JD 3-3', c:'JD1006', n:'Special Penal Laws (Elective)',                     u:2,d:'Thursday', t:'5:30-7:30 PM'},
+  {s:'JD 3-3', c:'JD1007', n:'Alternative Dispute Resolution (Elective)',         u:2,d:'Saturday', t:'2-4 PM'},
+  {s:'JD 3-3', c:'JD1001', n:'Thesis I',                                          u:1,d:'Thursday', t:'7:30-8:30 PM'},
+  {s:'JD 3-3', c:'JD105',  n:'Chilican Legal Education',                          u:2,d:'Wednesday',t:'7:30-9:30 PM'},
+  {s:'JD 2-1D',c:'JD306',  n:'Public International Law',                         u:3,d:'Monday',   t:'1-4 PM'},
+  {s:'JD 2-1D',c:'JD602',  n:'Civil Procedure I',                                u:3,d:'Friday',   t:'2-5 PM'},
+  {s:'JD 2-1D',c:'JD503',  n:'Property and Land Law',                            u:4,d:'Tuesday',  t:'1-5 PM'},
+  {s:'JD 2-1D',c:'JD701',  n:'Agency, Trust, and Partnership',                   u:2,d:'Thursday', t:'2-4 PM'},
+  {s:'JD 2-1D',c:'JD702',  n:'Corporation and Basic Securities Law',             u:3,d:'Wednesday',t:'2-5 PM'},
+  {s:'JD 2-1D',c:'JD801A', n:'Labor Law and Social Legislation',                 u:2,d:'Saturday', t:'2-4 PM'},
+  {s:'JD 2-1D',c:'JD104',  n:'Legal Forms',                                      u:2,d:'Saturday', t:'10-12 NN'},
+  {s:'JD 2-2', c:'JD306',  n:'Public International Law',                         u:3,d:'Monday',   t:'6-9 PM'},
+  {s:'JD 2-2', c:'JD602',  n:'Civil Procedure I',                                u:3,d:'Friday',   t:'6-9 PM'},
+  {s:'JD 2-2', c:'JD503',  n:'Property and Land Law',                            u:4,d:'Wednesday',t:'5:30-9:30 PM'},
+  {s:'JD 2-2', c:'JD701',  n:'Agency, Trust, and Partnership',                   u:2,d:'Tuesday',  t:'7:30-9:30 PM'},
+  {s:'JD 2-2', c:'JD702',  n:'Corporation and Basic Securities Law',             u:3,d:'Saturday', t:'9-12 NN'},
+  {s:'JD 2-2', c:'JD801A', n:'Labor Law and Social Legislation',                 u:2,d:'Tuesday',  t:'5:30-7:30 PM'},
+  {s:'JD 2-2', c:'JD104',  n:'Legal Forms',                                      u:2,d:'Saturday', t:'2-4 PM'},
+  {s:'JD 2-3', c:'JD306',  n:'Public International Law',                         u:3,d:'Friday',   t:'6-9 PM'},
+  {s:'JD 2-3', c:'JD602',  n:'Civil Procedure I',                                u:3,d:'Saturday', t:'2-5 PM'},
+  {s:'JD 2-3', c:'JD503',  n:'Property and Land Law',                            u:4,d:'Tuesday',  t:'5:30-9:30 PM'},
+  {s:'JD 2-3', c:'JD701',  n:'Agency, Trust, and Partnership',                   u:2,d:'Saturday', t:'10-12 NN'},
+  {s:'JD 2-3', c:'JD702',  n:'Corporation and Basic Securities Law',             u:3,d:'Monday',   t:'6-9 PM'},
+  {s:'JD 2-3', c:'JD801A', n:'Labor Law and Social Legislation',                 u:2,d:'Wednesday',t:'7:30-9:30 PM'},
+  {s:'JD 2-3', c:'JD104',  n:'Legal Forms',                                      u:2,d:'Wednesday',t:'5:30-7:30 PM'},
+  {s:'JD 2-4', c:'JD306',  n:'Public International Law',                         u:3,d:'Saturday', t:'2-5 PM'},
+  {s:'JD 2-4', c:'JD602',  n:'Civil Procedure I',                                u:3,d:'Monday',   t:'6-9 PM'},
+  {s:'JD 2-4', c:'JD503',  n:'Property and Land Law',                            u:4,d:'Wednesday',t:'5:30-9:30 PM'},
+  {s:'JD 2-4', c:'JD701',  n:'Agency, Trust, and Partnership',                   u:2,d:'Tuesday',  t:'5:30-7:30 PM'},
+  {s:'JD 2-4', c:'JD702',  n:'Corporation and Basic Securities Law',             u:3,d:'Saturday', t:'9-12 NN'},
+  {s:'JD 2-4', c:'JD801A', n:'Labor Law and Social Legislation',                 u:2,d:'Friday',   t:'7:30-9:30 PM'},
+  {s:'JD 2-4', c:'JD104',  n:'Legal Forms',                                      u:2,d:'Tuesday',  t:'7:30-9:30 PM'},
+];
+
+// Color palette pool for dynamic section assignment
+const COLOR_POOL = [
+  {bg:'#1565c0',fg:'#e3f2fd',dot:'#1565c0'},
+  {bg:'#2e7d32',fg:'#e8f5e9',dot:'#2e7d32'},
+  {bg:'#6a1b9a',fg:'#f3e5f5',dot:'#6a1b9a'},
+  {bg:'#e65100',fg:'#fff3e0',dot:'#e65100'},
+  {bg:'#7b0000',fg:'#ffebee',dot:'#7b0000'},
+  {bg:'#00695c',fg:'#e0f2f1',dot:'#00695c'},
+  {bg:'#558b2f',fg:'#f1f8e9',dot:'#558b2f'},
+  {bg:'#0277bd',fg:'#e1f5fe',dot:'#0277bd'},
+  {bg:'#4527a0',fg:'#ede7f6',dot:'#4527a0'},
+  {bg:'#ad1457',fg:'#fce4ec',dot:'#ad1457'},
+  {bg:'#37474f',fg:'#eceff1',dot:'#37474f'},
+  {bg:'#ef6c00',fg:'#fff3e0',dot:'#ef6c00'},
+];
+
+// Dynamic SC / SDot — rebuilt whenever dataset changes
+let SC = {}, SDot = {}, SCSS = {};
+
+function assignSectionColors(rawRows) {
+  const sections = [...new Set(rawRows.map(r=>r.s))];
+  SC = {}; SDot = {}; SCSS = {};
+  // Inject dynamic CSS classes
+  let styleEl = document.getElementById('dynSecStyles');
+  if (!styleEl) { styleEl = document.createElement('style'); styleEl.id='dynSecStyles'; document.head.appendChild(styleEl); }
+  let css = '';
+  sections.forEach((sec, i) => {
+    const col = COLOR_POOL[i % COLOR_POOL.length];
+    const cls = 'ds-' + sec.replace(/[^a-zA-Z0-9]/g,'_');
+    SC[sec]   = cls;
+    SDot[sec] = col.dot;
+    SCSS[sec] = col;
+    css += `.${cls}{background:${col.bg};color:${col.fg};}\n`;
+  });
+  styleEl.textContent = css;
+}
+
+let subs = [];
+
+function loadDataset(rawRows) {
+  assignSectionColors(rawRows);
+  subs = rawRows.map((r,i) => ({...r, id:i, p:parseT(r.t)}));
+}
+
+loadDataset(RAW);
+
+/* ── TIME PARSE ──────────────────────────────────────────────────────── */
+function parseT(str) {
+  if (!str) return null;
+  str = str.trim();
+  const nn = /NN/i.test(str), pm = /PM/i.test(str);
+  const cl = str.replace(/(AM|PM|NN)/gi,'').trim();
+  const [a,b] = cl.split('-');
+  if (!a||!b) return null;
+  const toMin = (t,isPM) => {
+    const [h,m=0] = t.includes(':') ? t.split(':').map(Number) : [+t,0];
+    if (nn) return h===12 ? 12*60+m : h*60+m;
+    if (isPM) return h<12 ? (h+12)*60+m : h*60+m;
+    return h*60+m;
+  };
+  return {start:toMin(a.trim(),pm), end:toMin(b.trim(),pm||nn)};
+}
+function mToL(m) {
+  const h=Math.floor(m/60), mn=m%60, sf=h>=12?'PM':'AM', dh=h>12?h-12:h===0?12:h;
+  return `${dh}:${mn.toString().padStart(2,'0')} ${sf}`;
+}
+
+/* ── STATE ───────────────────────────────────────────────────────────── */
+const SEL = new Set(); let ASec='all', SQ='';
+
+/* ── BUILD SECTION TABS (dynamic) ───────────────────────────────────── */
+function buildSecTabs() {
+  const sections = [...new Set(subs.map(s=>s.s))];
+  const container = document.getElementById('secTabs');
+  let html = `<button class="tabbtn ${ASec==='all'?'on':''}" onclick="fSec(this,'all')">All</button>`;
+  sections.forEach(sec => {
+    html += `<button class="tabbtn ${ASec===sec?'on':''}" onclick="fSec(this,'${sec.replace(/'/g,"\\'")}')">${sec}</button>`;
+  });
+  container.innerHTML = html;
+}
+
+/* ── BUILD LIST ──────────────────────────────────────────────────────── */
+function buildList() {
+  const secList = [...new Set(subs.map(s=>s.s))];
+  const cids = getConflictIds(getConflicts());
+  let html='';
+  secList.forEach(sec => {
+    const group = subs.filter(s=>s.s===sec);
+    if (!group.filter(mf).length) return;
+    html += `<div class="grp-lbl">${sec}</div>`;
+    group.forEach(s=>{
+      const isSel=SEL.has(s.id), isHid=!mf(s), isCon=cids.has(s.id);
+      html+=`<div class="scard ${isSel?'sel':''} ${isCon?'con':''} ${isHid?'hid':''}" id="c${s.id}" onclick="tog(${s.id})">
+        <div class="sc-top">
+          <div class="sc-name">${s.n}</div>
+          <div class="sc-chk">
+            <svg width="9" height="7" viewBox="0 0 9 7" fill="none">
+              <path d="M1 3.5L3.5 6L8 1" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+        </div>
+        <div class="chips">
+          <span class="chip cd">${s.c}</span>
+          <span class="chip un">${s.u}u</span>
+          <span class="chip sc">${s.s}</span>
+          <span class="chip sh">${DS[s.d]} · ${s.t}</span>
+        </div>
+      </div>`;
+    });
+  });
+  if (!html) html=`<div style="padding:20px;text-align:center;color:#aaa;font-size:12px;">No subjects match.</div>`;
+  document.getElementById('subList').innerHTML = html;
+}
+
+function mf(s) {
+  if (ASec!=='all' && s.s!==ASec) return false;
+  if (SQ) { const q=SQ.toLowerCase(); return s.n.toLowerCase().includes(q)||s.c.toLowerCase().includes(q)||s.s.toLowerCase().includes(q); }
+  return true;
+}
+function fSec(btn,sec){document.querySelectorAll('.tabbtn').forEach(b=>b.classList.remove('on'));btn.classList.add('on');ASec=sec;buildList();}
+function doSearch(){SQ=document.getElementById('srch').value;buildList();}
+
+/* ── TOGGLE / CLEAR ──────────────────────────────────────────────────── */
+function tog(id){SEL.has(id)?SEL.delete(id):SEL.add(id);refresh();}
+function clearAll(){SEL.clear();refresh();}
+function refresh(){buildSecTabs();buildList();renderCal();updateStats();}
+
+/* ── CONFLICTS ───────────────────────────────────────────────────────── */
+function getConflicts(){
+  const sel=[...SEL].map(id=>subs[id]).filter(s=>s.p);
+  const out=[];
+  for(let i=0;i<sel.length;i++) for(let j=i+1;j<sel.length;j++){
+    const a=sel[i],b=sel[j];
+    if(a.d!==b.d) continue;
+    if(a.p.start<b.p.end && b.p.start<a.p.end) out.push({a,b});
+  }
+  return out;
+}
+function getConflictIds(cs){const ids=new Set();cs.forEach(c=>{ids.add(c.a.id);ids.add(c.b.id);});return ids;}
+
+/* ── STATS ───────────────────────────────────────────────────────────── */
+function updateStats(){
+  const sel=[...SEL].map(id=>subs[id]);
+  const units=sel.reduce((s,x)=>s+x.u,0);
+  const cf=getConflicts();
+  document.getElementById('tagU').textContent=`${units} unit${units!==1?'s':''} selected`;
+  document.getElementById('tagS').textContent=`${sel.length} subject${sel.length!==1?'s':''}`;
+  const tc=document.getElementById('tagC'), btn=document.getElementById('expBtn');
+  if(cf.length){
+    tc.className='stag cwarn'; tc.textContent=`⚠ ${cf.length} time conflict${cf.length!==1?'s':''}`;
+    let h=`<strong>⚠ Conflicts Detected — Resolve before exporting:</strong><br>`;
+    cf.forEach(({a,b})=>{h+=`&nbsp;• <strong>${a.n}</strong> (${a.s}, ${a.d} ${a.t}) overlaps <strong>${b.n}</strong> (${b.s}, ${b.d} ${b.t})<br>`;});
+    document.getElementById('cpanel').innerHTML=h;
+    btn.disabled=true; btn.title='Resolve all conflicts first';
+  } else {
+    tc.className='stag cok'; tc.textContent='✓ No conflicts';
+    document.getElementById('cpanel').classList.remove('vis'); document.getElementById('cpanel').innerHTML='';
+    btn.disabled=sel.length===0; btn.title=sel.length===0?'Select subjects first':'';
+  }
+}
+function toggleCP(){if(!getConflicts().length)return;document.getElementById('cpanel').classList.toggle('vis');}
+
+/* ── CALENDAR ────────────────────────────────────────────────────────── */
+const CS=9*60,CE=22*60,SH=25;
+function renderCal(){
+  const box=document.getElementById('calBox');
+  const sel=[...SEL].map(id=>subs[id]).filter(s=>s.p);
+  if(!sel.length){
+    box.innerHTML=`<div class="empty-c"><div class="ei">📅</div>Select subjects to build your schedule.</div>`;
+    document.getElementById('leg').innerHTML=''; return;
+  }
+  const total=(CE-CS)/30;
+  let h=`<div class="cal-grid" style="grid-template-rows:34px repeat(${total},${SH}px);">`;
+  h+=`<div class="ch th">TIME</div>`;
+  DAYS.forEach(d=>{h+=`<div class="ch">${DS[d]}</div>`;});
+  for(let sl=0;sl<total;sl++){
+    const m=CS+sl*30, lbl=m%60===0?mToL(m):'';
+    h+=`<div class="tc">${lbl}</div>`;
+    DAYS.forEach(d=>{h+=`<div class="dc${m%60!==0?' half':''}" data-d="${d}" data-sl="${sl}"></div>`;});
+  }
+  h+=`</div>`;
+  box.innerHTML=h;
+  const grid=box.querySelector('.cal-grid');
+  const cids=getConflictIds(getConflicts());
+  DAYS.forEach((day,di)=>{
+    sel.filter(s=>s.d===day).forEach(s=>{
+      const {start,end}=s.p;
+      const rs=(start-CS)/30, re=(end-CS)/30;
+      if(rs<0||re>total) return;
+      const blk=document.createElement('div');
+      blk.className=`cblk ${SC[s.s]} ${cids.has(s.id)?'xcon':''}`;
+      blk.style.cssText=`grid-column:${di+2};grid-row:${rs+2}/span ${re-rs};position:relative;margin:2px;`;
+      blk.innerHTML=`<div class="ck">${s.c}</div><div class="cn">${s.n}</div><div class="ci">${s.s} · ${s.t}</div>`;
+      blk.title=`${s.n}\n${s.s} | ${s.d} ${s.t}\n${s.u} unit(s)`;
+      grid.appendChild(blk);
+    });
+  });
+  const usedSecs=[...new Set(sel.map(s=>s.s))];
+  document.getElementById('leg').innerHTML=usedSecs.map(sec=>
+    `<div class="li"><div class="ld" style="background:${SDot[sec]}"></div>${sec}</div>`).join('');
+}
+
+/* ── PDF EXPORT ──────────────────────────────────────────────────────── */
+function doExport(){
+  const cf=getConflicts(), sel=[...SEL].map(id=>subs[id]);
+  if(cf.length){
+    showM('⚠ Cannot Export — Conflicts Exist',
+      `Your schedule has <strong>${cf.length} time conflict${cf.length!==1?'s':''}</strong>.<br><br>
+      Please remove the conflicting subjects and try again. Conflicting subjects are highlighted in <strong style="color:#c62828">red</strong> on the left panel.`);
+    return;
+  }
+  if(!sel.length){ showM('No Subjects Selected','Please select at least one subject before exporting.'); return; }
+
+  const name  = document.getElementById('studentName').value.trim() || '________________________________';
+  const stnum = document.getElementById('studentNum').value.trim()  || '________________________________';
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({unit:'pt',format:'letter',orientation:'portrait'});
+  const PW=612, PH=792, ML=54, MR=54;
+  let y=48;
+
+  // Header block
+  doc.setFillColor(139,0,0);
+  doc.rect(ML, y-14, PW-ML-MR, 22, 'F');
+  doc.setFont('helvetica','bold');
+  doc.setFontSize(12);
+  doc.setTextColor(255,255,255);
+  doc.text('PUP COLLEGE OF LAW', ML+8, y+2);
+  y += 28;
+
+  doc.setFont('helvetica','normal');
+  doc.setFontSize(10.5);
+  doc.setTextColor(50,50,50);
+  doc.text('PRE-REGISTRATION FORM', ML, y);
+  y += 6;
+  doc.setDrawColor(139,0,0); doc.setLineWidth(0.8);
+  doc.line(ML, y, PW-MR, y);
+  y += 14;
+
+  // Student info
+  doc.setFont('helvetica','normal'); doc.setFontSize(10); doc.setTextColor(80,80,80);
+  doc.text('NAME:', ML, y);
+  doc.setFont('helvetica','bold'); doc.setTextColor(139,0,0);
+  doc.text(name, ML+36, y);
+  y += 15;
+  doc.setFont('helvetica','normal'); doc.setTextColor(80,80,80);
+  doc.text('STUDENT NO.:', ML, y);
+  doc.setFont('helvetica','bold'); doc.setTextColor(139,0,0);
+  doc.text(stnum, ML+70, y);
+  y += 16;
+
+  doc.setDrawColor(210,210,210); doc.setLineWidth(0.5);
+  doc.line(ML, y, PW-MR, y);
+  y += 12;
+
+  // Table
+  const TW = PW-ML-MR;
+  const COLS = [68,0,50,38,56,62]; // widths; col 1 fills rest
+  COLS[1] = TW - COLS.reduce((a,b)=>a+b,0);
+
+  doc.autoTable({
+    startY: y,
+    head: [['CODE','SUBJECT DESCRIPTION','Sec','Units','Day','Time']],
+    body: sel.map(s=>[s.c, s.n, s.s, s.u.toString(), s.d.substring(0,3), s.t]),
+    styles:{font:'helvetica',fontSize:9,cellPadding:5,lineColor:[200,200,200],lineWidth:0.4,valign:'middle'},
+    headStyles:{fillColor:[139,0,0],textColor:255,fontStyle:'bold',fontSize:9,halign:'center'},
+    columnStyles:{
+      0:{cellWidth:COLS[0],halign:'center'},
+      1:{cellWidth:COLS[1]},
+      2:{cellWidth:COLS[2],halign:'center'},
+      3:{cellWidth:COLS[3],halign:'center'},
+      4:{cellWidth:COLS[4],halign:'center'},
+      5:{cellWidth:COLS[5],halign:'center'},
+    },
+    alternateRowStyles:{fillColor:[255,248,248]},
+    margin:{left:ML,right:MR},
+    tableWidth: TW,
+  });
+
+  let ay = doc.lastAutoTable.finalY + 12;
+
+  // Total units row
+  doc.setFillColor(248,240,240);
+  doc.rect(ML, ay, TW, 18, 'F');
+  doc.setDrawColor(200,200,200); doc.setLineWidth(0.4);
+  doc.rect(ML, ay, TW, 18, 'S');
+  doc.setFont('helvetica','bold'); doc.setFontSize(9.5); doc.setTextColor(139,0,0);
+  const tot=sel.reduce((a,x)=>a+x.u,0);
+  doc.text(`TOTAL UNITS: ${tot}`, ML+8, ay+12);
+  ay += 30;
+
+  // Signature lines
+  const hw=(TW-20)/2;
+  const sx2=ML+hw+20;
+  if(ay>PH-120) ay=PH-120;
+
+  doc.setDrawColor(120,120,120); doc.setLineWidth(0.7);
+  doc.line(ML,ay,ML+hw,ay);
+  doc.line(sx2,ay,sx2+hw,ay);
+  doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(120,120,120);
+  doc.text("Student's Signature over Printed Name", ML, ay+10);
+  doc.text("College Secretary / Adviser", sx2, ay+10);
+  ay+=36;
+  doc.line(ML,ay,ML+hw,ay);
+  doc.setFontSize(8); doc.setTextColor(120,120,120);
+  doc.text("Date", ML, ay+10);
+
+  // Footer
+  doc.setDrawColor(139,0,0); doc.setLineWidth(1);
+  doc.line(ML, PH-38, PW-MR, PH-38);
+  doc.setFont('helvetica','italic'); doc.setFontSize(7.5); doc.setTextColor(139,0,0);
+  doc.text('Polytechnic University of the Philippines – College of Law  |  Pre-Registration Form  |  AY 2025', ML, PH-26);
+
+  const fn=`PreReg_${(name.replace(/[^a-zA-Z0-9]/g,'_')||'Student')}_${Date.now()}.pdf`;
+  doc.save(fn);
+}
+
+/* ── MODAL ───────────────────────────────────────────────────────────── */
+function showM(t,m){document.getElementById('mtitle').textContent=t;document.getElementById('mmsg').innerHTML=m;document.getElementById('mbg').classList.add('open');}
+function closeM(){document.getElementById('mbg').classList.remove('open');}
+
+/* ── XLSX IMPORT ENGINE ──────────────────────────────────────────────── */
+let pendingImport = null; // holds parsed rows before commit
+
+function openImport() {
+  pendingImport = null;
+  document.getElementById('dzFilename').style.display = 'none';
+  document.getElementById('dzFilename').textContent = '';
+  document.getElementById('imPreview').classList.remove('vis');
+  document.getElementById('imConfirm').disabled = true;
+  document.getElementById('xlsxFile').value = '';
+  document.getElementById('imbg').classList.add('open');
+}
+function closeImport() { document.getElementById('imbg').classList.remove('open'); }
+
+function dzDrag(e, over) {
+  e.preventDefault();
+  document.getElementById('dropzone').classList.toggle('drag-over', over);
+}
+function dzDrop(e) {
+  e.preventDefault();
+  document.getElementById('dropzone').classList.remove('drag-over');
+  const file = e.dataTransfer.files[0];
+  if (file) processFile(file);
+}
+function onFileChosen(e) {
+  const file = e.target.files[0];
+  if (file) processFile(file);
+}
+
+function processFile(file) {
+  const ext = file.name.split('.').pop().toLowerCase();
+  if (!['xlsx','xls'].includes(ext)) {
+    showPreviewError(['File must be .xlsx or .xls format.']);
+    return;
+  }
+  const fn = document.getElementById('dzFilename');
+  fn.textContent = '📄 ' + file.name; fn.style.display = 'block';
+
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const wb = XLSX.read(e.target.result, {type:'array'});
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+      parseAndPreview(rows, file.name);
+    } catch(err) {
+      showPreviewError([`Could not read file: ${err.message}`]);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function parseAndPreview(rows, filename) {
+  // Expected columns (0-based): 0=Section, 1=Code, 2=Subject Description, 3=Units,
+  // 4=Monday, 5=Tuesday, 6=Wednesday, 7=Thursday, 8=Friday, 9=Saturday
+  const EXPECTED_COLS = ['Section','Code','Subject Desc','Units','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  const errors = [];
+  const parsed = [];
+
+  // Skip header row (row 0) — start from row 1
+  const dataRows = rows.slice(1).filter(r => r.some(c => String(c).trim() !== ''));
+
+  if (dataRows.length === 0) {
+    showPreviewError(['Spreadsheet appears to be empty (no data rows found).']);
+    return;
+  }
+
+  // Validate header hints
+  const hdr = rows[0] || [];
+  const hasSection = String(hdr[0]||'').toLowerCase().includes('section');
+  const hasCode    = String(hdr[1]||'').toLowerCase().includes('code');
+  if (!hasSection && !hasCode && rows[0]) {
+    errors.push('⚠ Header row does not match expected format (Section, Code, Subject Description, Units, Monday–Saturday). Proceeding with best-effort parse.');
+  }
+
+  const DAYNAMES = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  const DAYCOLS  = [4, 5, 6, 7, 8, 9];
+
+  dataRows.forEach((row, ri) => {
+    const section = String(row[0]||'').trim();
+    const code    = String(row[1]||'').trim();
+    const name    = String(row[2]||'').trim();
+    const units   = parseInt(row[3]) || 0;
+
+    if (!section || !code || !name) {
+      if (section || code || name) // only flag partially-filled rows
+        errors.push(`Row ${ri+2}: Missing required field (Section="${section}", Code="${code}", Subject="${name}") — skipped.`);
+      return;
+    }
+    if (units <= 0) {
+      errors.push(`Row ${ri+2}: Invalid units value "${row[3]}" for ${code} — defaulting to 0.`);
+    }
+
+    // Find which day column has a time value
+    let day = null, time = null;
+    DAYCOLS.forEach((ci, di) => {
+      const val = String(row[ci]||'').trim();
+      if (val) { day = DAYNAMES[di]; time = val; }
+    });
+
+    if (!day || !time) {
+      errors.push(`Row ${ri+2}: No schedule time found for ${code} (${section}) — skipped.`);
+      return;
+    }
+
+    // Validate time can be parsed
+    const tp = parseT(time);
+    if (!tp) {
+      errors.push(`Row ${ri+2}: Unrecognised time format "${time}" for ${code} — entry included but may not render on calendar.`);
+    }
+
+    parsed.push({ s:section, c:code, n:name, u:units, d:day, t:time });
+  });
+
+  if (parsed.length === 0) {
+    showPreviewError(['No valid subject rows could be parsed from this file. Check the column layout.', ...errors]);
+    return;
+  }
+
+  // Show preview
+  pendingImport = parsed;
+  renderPreview(parsed, errors, filename);
+}
+
+function showPreviewError(msgs) {
+  pendingImport = null;
+  document.getElementById('imConfirm').disabled = true;
+  const preview = document.getElementById('imPreview');
+  preview.classList.add('vis');
+  document.getElementById('impStatus').textContent = '✕ Cannot Import';
+  document.getElementById('impStatus').className = 'imp-status err';
+  document.getElementById('impScroll').innerHTML = msgs.map(m =>
+    `<div class="imp-row err-row">⚠ ${m}</div>`).join('');
+  document.getElementById('impSummary').innerHTML = '';
+}
+
+function renderPreview(parsed, errors, filename) {
+  const preview = document.getElementById('imPreview');
+  preview.classList.add('vis');
+  const hasErrors = errors.length > 0;
+  document.getElementById('impStatus').textContent = hasErrors ? `✓ Ready (${errors.length} warning${errors.length!==1?'s':''})` : '✓ Ready to Import';
+  document.getElementById('impStatus').className = 'imp-status ok';
+
+  const sections = [...new Set(parsed.map(r=>r.s))];
+  let html = '';
+
+  if (hasErrors) {
+    errors.forEach(e => { html += `<div class="imp-row err-row">⚠ ${e}</div>`; });
+    html += `<div class="imp-row" style="background:#f5f5f5;color:#888;font-style:italic;">— Sections found —</div>`;
+  }
+  sections.forEach((sec, i) => {
+    const cnt = parsed.filter(r=>r.s===sec).length;
+    const col = COLOR_POOL[i % COLOR_POOL.length];
+    html += `<div class="imp-row sec-row">
+      <div class="imp-dot" style="background:${col.dot}"></div>
+      <strong>${sec}</strong> &nbsp;·&nbsp; ${cnt} subject${cnt!==1?'s':''}
+    </div>`;
+  });
+  document.getElementById('impScroll').innerHTML = html;
+
+  const totalUnits = parsed.reduce((s,r)=>s+r.u, 0);
+  document.getElementById('impSummary').innerHTML =
+    `<span><strong>${parsed.length}</strong> subjects</span>
+     <span><strong>${sections.length}</strong> sections</span>
+     <span><strong>${totalUnits}</strong> total units</span>
+     <span style="margin-left:auto;color:#aaa">${filename}</span>`;
+
+  document.getElementById('imConfirm').disabled = false;
+}
+
+function commitImport() {
+  if (!pendingImport || !pendingImport.length) return;
+
+  // Replace dataset
+  loadDataset(pendingImport);
+  SEL.clear();
+  ASec = 'all';
+  SQ = '';
+  document.getElementById('srch').value = '';
+
+  // Update db badge
+  const badge = document.getElementById('dbBadge');
+  badge.textContent = `📋 Custom Dataset (${pendingImport.length} subjects)`;
+  badge.className = 'db-badge custom';
+
+  closeImport();
+  refresh();
+  showM('✓ Database Updated',
+    `Successfully loaded <strong>${pendingImport.length} subjects</strong> across <strong>${[...new Set(pendingImport.map(r=>r.s))].length} sections</strong>.<br><br>
+    Your previous selections have been cleared. You can now build your schedule from the new dataset.`);
+  pendingImport = null;
+}
+
+/* ── INIT ────────────────────────────────────────────────────────────── */
+buildSecTabs(); buildList(); renderCal(); updateStats();
+</script>
+</body>
+</html>
